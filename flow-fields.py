@@ -175,6 +175,18 @@ def trace_field(v_field, step_size=0.01, d_sep=0.05):
     return lines, widths
 
 
+color_palettes = {
+    "autumn": [ "#03071e", "#370617", "#6a040f", "#9d0208", "#d00000", "#dc2f02",
+                "#e85d04", "#f48c06", "#faa307", "#ffba08"],
+    "violet-red": ["#ea698b","#d55d92","#c05299","#ac46a1","#973aa8","#822faf",
+                   "#6d23b6","#6411ad","#571089","#47126b"],
+    "blue-orange": ["#8ecae6", "#73bfdc", "#58b4d1", "#219ebc", "#126782", "#023047", 
+                    "#ffb703", "#fd9e02", "#fb8500", "#fb9017"],
+    "blue-berry": ["#b7094c", "#a01a58", "#892b64", "#723c70", "#5c4d7d", "#455e89", 
+                   "#2e6f95", "#1780a1", "#0091ad"],
+    "black-white": ["#000000", "#ffffff"]
+}
+
 
 if __name__ == "__main__":
     step_size = 0.005
@@ -201,33 +213,8 @@ if __name__ == "__main__":
     plot_style = "lines"
     outline = False
 
-    cmap=plt.get_cmap("tab10")
-    colors = cmap(np.random.rand(len(lines)))
-
-    warm = ["#a47053", "#efca66", "#ecdab9", "#cec3c8", "#909cac"]
-    sun = ["#7c7b89", "#f1e4de", "#f4d75e", "#e9723d", "#0b7fab"]
-    sea = ["#002a29", "#007a79", "#c7cedf", "#976f4f", "#4d2a16"]
-    blue = ["#012e67", "#9cacbf", "#2b6684", "#032e42", "#0a1417"]
-    blue2 = ["#274b69", "#85a1c1", "#c6ccd8", "#3f4d63", "#202022"]
-    pastel = ["#5b828e", "#bbcfd7", "#d2c8bc", "#ba9a88", "#ac7e62"]
-    green = ["#487549", "#abba82", "#a7b5b7", "#037c87", "#102020"]
-    pomegranade = ["#ed8b77", "#dc5322", "#a5142a"] # "#310003", "#0d1316"]
-    gray = ["#181614", "#2b292b", "#92817b", "#aca6a6", "#e5ecf3"]
-    orange = ["#c43d16", "#edc596", "#fcb500", "#dc6d02"]
-    red = ["#ac0e28", "#bc4558", "#490009"]
-    # accent = ["#363634", "#524636", "#ac7330", "#b19a78", "#d1c5ab"]
-
-    warm = ["#ae1903", "#c43d16", "#c43d16", "#edc596", "#fcb500", "#dc6d02", "#770f10", "#621122", "#d40000", "#fab73d", "#e6b95f"]
-    red_tones = ["#e28413", "#ec7415","#f16c16","#f56416","#ef5e17","#e95818","#dd4b1a","#e6391b","#ef271b"] 
-    autumn_tones = ["#03071e","#370617","#6a040f","#9d0208","#d00000","#dc2f02","#e85d04","#f48c06","#faa307","#ffba08"]
-    violet = ["#97dffc","#93caf6","#8eb5f0","#858ae3","#7364d2","#613dc1","#5829a7","#4e148c","#461177","#3d0e61"]
-    violet_red = ["#ea698b","#d55d92","#c05299","#ac46a1","#973aa8","#822faf","#6d23b6","#6411ad","#571089","#47126b"]
-
-    red_blue = ["#b7094c","#a01a58","#892b64","#723c70","#5c4d7d","#455e89","#2e6f95","#1780a1","#0091ad"]
-    blue_orange = ["#8ecae6","#73bfdc","#58b4d1","#219ebc","#126782","#023047","#ffb703","#fd9e02","#fb8500","#fb9017"]
-
-    accent = autumn_tones
-    selection = autumn_tones
+    accent = color_palettes["autumn"]
+    selection = color_palettes["autumn"]
     colors = np.random.choice(selection, len(lines))
 
 

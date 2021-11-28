@@ -1,51 +1,13 @@
+from time import perf_counter
 import numpy as np
 import numba
 from matplotlib import pyplot as plt
-
-def perlin(x, y, seed=0):
-    """Generates perlin noise.
-    Copied from https://stackoverflow.com/a/42154921
-    """
-    # Permutation table
-    np.random.seed(seed)
-    p = np.arange(256, dtype=int)
-    np.random.shuffle(p)
-    p = np.stack([p, p]).flatten()
-    # Coordinates of the top-left
-    xi = x.astype(int)
-    yi = y.astype(int)
-    # Internal coordinates
-    xf = x - xi
-    yf = y - yi
-    # Fade factors
-    u = fade(xf)
-    v = fade(yf)
-    # Noise components
-    n00 = gradient(p[p[xi]+yi],xf,yf)
-    n01 = gradient(p[p[xi]+yi+1],xf,yf-1)
-    n11 = gradient(p[p[xi+1]+yi+1],xf-1,yf-1)
-    n10 = gradient(p[p[xi+1]+yi],xf-1,yf)
-    # Combine noises
-    x1 = lerp(n00, n10, u)
-    x2 = lerp(n01, n11, u)
-    return lerp(x1, x2, v)
+from perlin2D import generate_fractal_noise_2d, generate_perlin_noise_2d
 
 @numba.jit(fastmath=True, cache=True)
 def lerp(a, b, x):
     """Linear interpolation."""
     return a + x * (b - a)
-
-def fade(t):
-    """Interpolation function for perlin noise.
-    f(t) = 6t^5 - 15t^4 + 10t^3
-    """
-    return 6 * t**5 - 15 * t**4 + 10 * t**3
-
-def gradient(h, x, y):
-    """Grad converts h to the right gradient vector and return the dot product with (x, y)."""
-    vectors = np.array([[0,1],[0,-1],[1,0],[-1,0]])
-    g = vectors[h%4]
-    return g[:,:,0] * x + g[:,:,1] * y
 
 def curl(field, x, y, eps=0.001):
     """Computes curl of a 2D vector field."""
@@ -122,7 +84,7 @@ def trace_line(seed_point, lines, widths, v_field, step_size, d_sep):
     return np.array(line)
 
 
-def trace_field(v_field, x, y, step_size=0.01, d_sep=0.05):
+def trace_field(v_field, step_size=0.01, d_sep=0.05):
 
     lines = []
     widths = []
@@ -215,21 +177,18 @@ def trace_field(v_field, x, y, step_size=0.01, d_sep=0.05):
 
 
 if __name__ == "__main__":
-    lin = np.linspace(0, 1.5, 1000)
-    x, y = np.meshgrid(lin, lin)
     step_size = 0.005
     d_sep = 0.01
-    eps = 0.000001
-    v_field = curl(perlin, x, y)
-    angle_field = 2 * np.pi * perlin(x, y, seed=3)
+
+    angle_field = np.pi * generate_fractal_noise_2d((1000, 1000), (1, 1), octaves=2, persistence=2)
+    # angle_field = np.pi * np.round(generate_perlin_noise_2d((1000, 1000), (2, 2)) * 4) / 4
     # angle_field = np.round(angle_field * 1) / 2  # Discrete angles
     v_field = np.array([np.cos(angle_field), np.sin(angle_field)])
 
     # v_field = curl(perlin, x, y)
     # v_field = v_field / (np.sqrt(np.sum(v_field**2, axis=0)) + eps) # Normalize field
 
-
-    lines, widths = trace_field(v_field, x, y, step_size=step_size, d_sep=d_sep)
+    lines, widths = trace_field(v_field, step_size=step_size, d_sep=d_sep)
 
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.axis("equal")

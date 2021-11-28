@@ -83,94 +83,34 @@ def trace_line(seed_point, lines, widths, v_field, step_size, d_sep):
     
     return np.array(line)
 
-
-def trace_field(v_field, step_size=0.01, d_sep=0.05):
-
+def trace_field(field, step_size):
     lines = []
     widths = []
-    queue = []
-    start_point = np.random.rand(2) # Random starting point
     
-    # Generate first line
-    line = trace_line(start_point, lines, widths, v_field, step_size, d_sep)
+    width_scale = 0.08
+    max_attempts = 1000  # Max attempts at finding a valid starting point
+    n_lines_max = 300
+    for _ in range(n_lines_max):
 
-    lines.append(line)
-    widths.append(d_sep)
-    queue.append(line)
+        # Start with thick lines and gradually decrease width
+        scale = 1 / (len(lines) / 20 + 2) * width_scale * (np.random.rand(1) * 0.5 + 0.5)
+        # scale = (0.05 - 0.005) * ((n_lines_max - len(lines)) / n_lines_max)**5  + 0.005
+        width = max(float(scale), step_size / 5)
 
-    finished = False
-    counter = 0
-
-    current_line = queue.pop(0)
-
-    # while not finished and counter < 10000:
-
-    #     d_sep = np.asscalar(np.random.rand(1) * 0.06 + 0.01)
-
-    #     # Generate normal vector from line segments
-    #     normal = np.fliplr(np.diff(current_line, axis=0)) * np.array([[-1, 1]])
-    #     # Offset vectors = normalized normal * d_sep
-    #     offset = normal / np.sqrt(np.sum(normal**2, axis=1))[:, None] * d_sep * 1.2
-    #     seed_found = False
-    #     for i in range(current_line.shape[0] - 1):
-    #         seed_point = current_line[i] + offset[i]
-
-    #         if not is_collision(seed_point, lines, widths, d_sep):
-    #             seed_found = True
-    #             break
-
-    #         seed_point = current_line[i] - offset[i]
-
-    #         if not is_collision(seed_point, lines, widths, d_sep):
-    #             seed_found = True
-    #             break
-
-    #     if seed_found:
-    #         # Compute stream line
-    #         line = trace_line(seed_point, lines, widths, v_field, step_size, d_sep)
-
-    #         lines.append(line)
-    #         widths.append(d_sep)
-    #         queue.append(line)
-    #     else:
-    #         if len(queue) < 1:
-    #             finished = True
-    #         else:
-    #             current_line = queue.pop(0)
-
-    #     counter += 1
-    lines = []
-    widths = []
-
-    finished = False
-    max_itr = 300
-    while not finished and counter < max_itr:
-
-        scale = (0.05 - 0.005) * ((max_itr - counter) / max_itr)**5  + 0.005
-        scale = max(1 / (counter/20 + 2) * 0.08, step_size)
-
-        attempts = 0
-        while attempts < 1000:
-            d_sep = np.asscalar(np.random.rand(1) * 0.04 + 0.005) + scale
-            d_sep = scale * np.asscalar(np.random.rand(1)* 0.5 + 0.5)
-            # d_sep = np.asscalar(np.clip(np.random.exponential(0.2, 1), 0, 1)) * 0.07 + 0.003
-            seed_point = np.random.rand(2)
-            if is_collision(seed_point, lines, widths, d_sep):
-                attempts += 1
-            else:
+        # Try to generate valid starting point for new line
+        p_start_valid = False
+        for _ in range(max_attempts):
+            p_start = np.random.rand(2)
+            if not is_collision(p_start, lines, widths, width):
+                p_start_valid = True
                 break
 
-        if attempts < 1000:
-            line = trace_line(seed_point, lines, widths, v_field, step_size, d_sep)
-
+        if p_start_valid:
+            line = trace_line(p_start, lines, widths, field, step_size, width)
             lines.append(line)
-            widths.append(d_sep)
-            counter += 1
+            widths.append(width)
         else:
-            finished = True
-
-        # counter += 1
-            
+            break
 
     return lines, widths
 
@@ -200,7 +140,7 @@ if __name__ == "__main__":
     # v_field = curl(perlin, x, y)
     # v_field = v_field / (np.sqrt(np.sum(v_field**2, axis=0)) + eps) # Normalize field
 
-    lines, widths = trace_field(v_field, step_size=step_size, d_sep=d_sep)
+    lines, widths = trace_field(v_field, step_size)
 
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.axis("equal")

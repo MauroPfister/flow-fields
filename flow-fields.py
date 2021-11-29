@@ -48,23 +48,23 @@ def curl(field, x, y, eps=0.001):
     return curl
 
 @numba.jit(nopython=True, fastmath=True, cache=True)
-def get_v_field(v_field, x, y):
+def get_vector_field(field, point):
     """Get vector field value at query point (x, y).
     Linearly interpolates between grid cells.
     """
-    h, w = v_field.shape[1:3]
+    h, w = field.shape[0:2]
 
-    i_x = x * (w - 1)
-    i_y = y * (h - 1)
+    i_x = point[0] * (w - 1)
+    i_y = point[1] * (h - 1)
 
     cell_x = int(i_x)
     cell_y = int(i_y)
     frac_x = i_x % 1
     frac_y = i_y % 1
-
+    
     return lerp(
-           lerp(v_field[:, cell_y, cell_x    ], v_field[:, cell_y    , cell_x + 1], frac_x),
-           lerp(v_field[:, cell_y, cell_x + 1], v_field[:, cell_y + 1, cell_x + 1], frac_x),
+           lerp(field[cell_y, cell_x    ], field[cell_y    , cell_x + 1], frac_x),
+           lerp(field[cell_y, cell_x + 1], field[cell_y + 1, cell_x + 1], frac_x),
            frac_y)
 
 def is_collision(point, width, lines, widths, safety_fac=1.5):
@@ -72,7 +72,7 @@ def is_collision(point, width, lines, widths, safety_fac=1.5):
         return False
 
     # Array with line width of every point on every line 
-    widths_all_points = np.repeat(widths, [line.shape[0] for line in lines], axis=0)
+    widths_all_points = np.repeat(widths, [line.shape[0] for line in lines])
     all_points = np.vstack(lines)
     # Squared distance between query point and points of all the other lines
     dist = np.sum((all_points - point)**2, axis=1)
@@ -83,7 +83,7 @@ def is_collision(point, width, lines, widths, safety_fac=1.5):
 def out_of_bounds(point, x_lim, y_lim):
     return point[0] < x_lim[0] or point[0] > x_lim[1] or point[1] < y_lim[0] or point[1] > y_lim[1]
 
-def trace_line(start_point, width, lines, widths, v_field, step_size):
+def trace_line(start_point, width, lines, widths, field, step_size):
     x_lim = [0, 1]
     y_lim = [0, 1]
     line = [start_point]
@@ -93,7 +93,7 @@ def trace_line(start_point, width, lines, widths, v_field, step_size):
     max_iter = int(max_length / step_size)
     for i in range(max_iter):
         point = line[-1]
-        vel = get_v_field(v_field, *point)
+        vel = get_vector_field(field, point)
         point_new = point + vel * step_size
         if is_collision(point_new, width, lines, widths) or out_of_bounds(point_new, x_lim, y_lim):
             break
@@ -102,7 +102,7 @@ def trace_line(start_point, width, lines, widths, v_field, step_size):
     line.reverse()
     for i in range(max_iter):
         point = line[-1]
-        vel = get_v_field(v_field, *point)
+        vel = get_vector_field(field, point)
         point_new = point - vel * step_size
         if is_collision(point_new, width, lines, widths) or out_of_bounds(point_new, x_lim, y_lim):
             break
@@ -162,12 +162,15 @@ if __name__ == "__main__":
     angle_field = np.pi * generate_fractal_noise_2d((1000, 1000), (1, 1), octaves=2, persistence=2)
     # angle_field = np.pi * np.round(generate_perlin_noise_2d((1000, 1000), (2, 2)) * 4) / 4
     # angle_field = np.round(angle_field * 1) / 2  # Discrete angles
-    v_field = np.array([np.cos(angle_field), np.sin(angle_field)])
+    field = np.stack([np.cos(angle_field), np.sin(angle_field)], axis=2)
 
     # v_field = curl(perlin, x, y)
     # v_field = v_field / (np.sqrt(np.sum(v_field**2, axis=0)) + eps) # Normalize field
 
-    lines, widths = trace_field(v_field, step_size)
+    t_start = perf_counter()
+    lines, widths = trace_field(field, step_size)
+    t_end = perf_counter()
+    print(f"Ellapsed time: {t_end - t_start: .2f} s")
 
     fig = plt.figure()
     fig.set_size_inches(8, 8)

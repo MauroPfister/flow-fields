@@ -1,6 +1,5 @@
 from time import perf_counter
 import numpy as np
-import numba
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 from perlin2D import generate_fractal_noise_2d, generate_perlin_noise_2d
@@ -31,7 +30,6 @@ class Line(Line2D):
     _linewidth = property(_get_lw, _set_lw)
 
 
-@numba.jit(fastmath=True, cache=True)
 def lerp(a, b, x):
     """Linear interpolation."""
     return a + x * (b - a)
@@ -47,7 +45,6 @@ def curl(field, x, y, eps=0.001):
     curl = np.array([x_comp, - y_comp]) 
     return curl
 
-@numba.jit(nopython=True, fastmath=True, cache=True)
 def get_vector_field(field, point):
     """Get vector field value at query point (x, y).
     Linearly interpolates between grid cells.

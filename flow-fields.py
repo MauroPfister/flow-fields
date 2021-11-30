@@ -36,6 +36,17 @@ def lerp(a, b, x):
     return a + x * (b - a)
 
 
+def map_range(x, out_min, out_max):
+    """Linearly map the range of x from min(x), max(x) to out_min, out_max."""
+    in_min, in_max = x.min(), x.max()
+    return (x - in_min) / (in_max - in_min) * (out_max - out_min) + out_min
+
+
+def round_to_nearest(x, a):
+    """Round values of x to nearest multiple of a."""
+    return np.round(x / a) * a
+
+
 def curl(field, x, y, eps=0.001):
     """Computes curl of a 2D vector field."""
     # grad = np.gradient(field(x, y))
@@ -181,6 +192,20 @@ def trace_field(field, bounds, max_len, width_dist, n_max_lines, interpolate, st
     return lines, widths
 
 
+def generate_field(n_cells, min_angle, max_angle, round_to=0):
+    """Generate vector field with n_cells."""
+    noise = generate_fractal_noise_2d((n_cells, n_cells), 
+                                      (1, 1),
+                                      octaves=2, 
+                                      persistence=0.5)
+    angle_field = map_range(noise, min_angle, max_angle)
+    if round_to:
+        angle_field = round_to_nearest(angle_field, round_to)
+    field = np.stack([np.cos(angle_field), np.sin(angle_field)], axis=2)
+
+    return field
+
+
 def fig_setup(col_bg="#ffffff"):
     """Set up figure for plotting."""
     fig = plt.figure(figsize=(8, 8))
@@ -255,14 +280,9 @@ if __name__ == "__main__":
     max_width = 0.08
     n_max_lines = 300
     interpolate = True
+    n_cells = 200
 
-    noise = generate_fractal_noise_2d((1000, 1000), (1, 1), octaves=2, persistence=2)
-    angle_field = np.pi * ((noise - noise.min()) / (noise.max() - noise.min()) * 2 - 1)
-    angle_field = np.pi * noise
-    # angle_field = np.pi * np.round(generate_perlin_noise_2d((1000, 1000), (2, 2)) * 4) / 4
-    # angle_field = np.round(angle_field * np.pi / 4) / 4 * np.pi  # Discrete angles
-    field = np.stack([np.cos(angle_field), np.sin(angle_field)], axis=2)
-
+    field = generate_field(n_cells, -np.pi, np.pi, round_to=0)
     width_dist = generate_width_dist("decreasing", max_width)
     t_start = perf_counter()
     lines, widths = trace_field(field, bounds, max_len, width_dist, n_max_lines, interpolate, step_size)

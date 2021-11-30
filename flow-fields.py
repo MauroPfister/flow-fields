@@ -1,7 +1,9 @@
+from random import uniform
 from time import perf_counter
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
+from functools import partial
 from perlin2D import generate_fractal_noise_2d, generate_perlin_noise_2d
 
 class Line(Line2D):
@@ -45,24 +47,29 @@ def curl(field, x, y, eps=0.001):
     curl = np.array([x_comp, - y_comp]) 
     return curl
 
-def get_vector_field(field, point):
-    """Get vector field value at query point (x, y).
+def get_velocity(point, field, bounds, interpolate):
+    """Get velocity of field at query point (x, y).
     Linearly interpolates between grid cells.
     """
+    x_min, y_min, x_max, y_max = bounds
     h, w = field.shape[0:2]
 
-    i_x = point[0] * (w - 1)
-    i_y = point[1] * (h - 1)
+    i = (point[0] - x_min) / (x_max - x_min) * (w - 1)
+    j = (point[1] - y_min) / (y_max - y_min) * (h - 1)
 
-    cell_x = int(i_x)
-    cell_y = int(i_y)
-    frac_x = i_x % 1
-    frac_y = i_y % 1
+    cell_x = int(i)
+    cell_y = int(j)
+    frac_x = i % 1
+    frac_y = j % 1
+
+    if interpolate:
+        vel = lerp(lerp(field[cell_y, cell_x    ], field[cell_y    , cell_x + 1], frac_x),
+                   lerp(field[cell_y, cell_x + 1], field[cell_y + 1, cell_x + 1], frac_x),
+                   frac_y)
+    else:
+        vel = field[cell_y, cell_x]
     
-    return lerp(
-           lerp(field[cell_y, cell_x    ], field[cell_y    , cell_x + 1], frac_x),
-           lerp(field[cell_y, cell_x + 1], field[cell_y + 1, cell_x + 1], frac_x),
-           frac_y)
+    return vel
 
 def is_collision(point, width, lines, widths, safety_fac=1.5):
     if len(lines) < 1:
@@ -77,60 +84,79 @@ def is_collision(point, width, lines, widths, safety_fac=1.5):
 
     return np.any(is_collision)
 
-def out_of_bounds(point, x_lim, y_lim):
-    return point[0] < x_lim[0] or point[0] > x_lim[1] or point[1] < y_lim[0] or point[1] > y_lim[1]
+def out_of_bounds(point, width, bounds):
+    x_min, y_min, x_max, y_max = bounds
+    r = width / 2
+    out_of_bounds = (   point[0] - r < x_min 
+                     or point[0] + r > x_max 
+                     or point[1] - r < y_min 
+                     or point[1] + r > y_max)
+    return out_of_bounds
 
-def trace_line(start_point, width, lines, widths, field, step_size):
-    x_lim = [0, 1]
-    y_lim = [0, 1]
+def generate_width_fun(name, max_width):
+    # width = (0.05 - 0.005) * ((n_max_lines - len(lines)) / n_max_lines)**5  + 0.005
+
+    width_fun = None
+    if name == "uniform":
+        width_fun = partial(uniform_width, width=max_width)
+    elif name == "decreasing":
+        width_fun = partial(decreasing_width, max_width=max_width)
+         
+    return width_fun
+
+def uniform_width(x, width):
+    return width
+
+def decreasing_width(x, max_width):
+    """Start with thick lines and gradually decrease width."""
+    width = 2 / (x / 20 + 2) * max_width * (np.random.rand(1) * 0.5 + 0.5)
+    return width
+
+def trace_line(start_point, width, lines, widths, field, bounds, max_len, interpolate, step_size):
     line = [start_point]
+    n_points = int(max_len / 2 / step_size)
 
-    max_length = 0.1
-
-    max_iter = int(max_length / step_size)
-    for i in range(max_iter):
+    # Trace forward
+    for _ in range(n_points):
         point = line[-1]
-        vel = get_vector_field(field, point)
+        vel = get_velocity(point, field, bounds, interpolate)
         point_new = point + vel * step_size
-        if is_collision(point_new, width, lines, widths) or out_of_bounds(point_new, x_lim, y_lim):
+        if is_collision(point_new, width, lines, widths) or out_of_bounds(point_new, width, bounds):
             break
         line.append(point_new)
 
+    # Trace backward
     line.reverse()
-    for i in range(max_iter):
+    for _ in range(n_points):
         point = line[-1]
-        vel = get_vector_field(field, point)
+        vel = get_velocity(point, field, bounds, interpolate)
         point_new = point - vel * step_size
-        if is_collision(point_new, width, lines, widths) or out_of_bounds(point_new, x_lim, y_lim):
+        if is_collision(point_new, width, lines, widths) or out_of_bounds(point_new, width, bounds):
             break
         line.append(point_new)
     
     return np.array(line)
 
-def trace_field(field, step_size):
+def trace_field(field, bounds, max_len, width_fun, n_max_lines, interpolate, step_size):
     lines = []
     widths = []
 
-    width_scale = 0.16
     max_attempts = 1000  # Max attempts at finding a valid starting point
-    n_lines_max = 300
-    for _ in range(n_lines_max):
-
-        # Start with thick lines and gradually decrease width
-        scale = 1 / (len(lines) / 20 + 2) * width_scale * (np.random.rand(1) * 0.5 + 0.5)
-        # scale = (0.05 - 0.005) * ((n_lines_max - len(lines)) / n_lines_max)**5  + 0.005
-        width = max(float(scale), step_size / 5)
+    for i in range(n_max_lines):
+        width = width_fun(i)
+        width = max(float(width), step_size / 5)
 
         # Try to generate valid starting point for new line
         start_point_valid = False
         for _ in range(max_attempts):
-            start_point = np.random.rand(2)
-            if not is_collision(start_point, width, lines, widths):
+            start_point = np.random.uniform(bounds[0:2], bounds[2:4])
+            if not (   is_collision(start_point, width, lines, widths) 
+                    or out_of_bounds(start_point, width, bounds)):
                 start_point_valid = True
                 break
 
         if start_point_valid:
-            line = trace_line(start_point, width, lines, widths, field, step_size)
+            line = trace_line(start_point, width, lines, widths, field, bounds, max_len, interpolate, step_size)
             lines.append(line)
             widths.append(width)
         else:
@@ -138,53 +164,28 @@ def trace_field(field, step_size):
 
     return lines, widths
 
-
-color_palettes = {
-    "autumn": [ "#03071e", "#370617", "#6a040f", "#9d0208", "#d00000", "#dc2f02",
-                "#e85d04", "#f48c06", "#faa307", "#ffba08"],
-    "violet-red": ["#ea698b","#d55d92","#c05299","#ac46a1","#973aa8","#822faf",
-                   "#6d23b6","#6411ad","#571089","#47126b"],
-    "blue-orange": ["#8ecae6", "#73bfdc", "#58b4d1", "#219ebc", "#126782", "#023047", 
-                    "#ffb703", "#fd9e02", "#fb8500", "#fb9017"],
-    "blue-berry": ["#b7094c", "#a01a58", "#892b64", "#723c70", "#5c4d7d", "#455e89", 
-                   "#2e6f95", "#1780a1", "#0091ad"],
-    "black-white": ["#000000", "#ffffff"]
-}
-
-
-if __name__ == "__main__":
-    step_size = 0.005
-    width = 0.01
-
-    angle_field = np.pi * generate_fractal_noise_2d((1000, 1000), (1, 1), octaves=2, persistence=2)
-    # angle_field = np.pi * np.round(generate_perlin_noise_2d((1000, 1000), (2, 2)) * 4) / 4
-    # angle_field = np.round(angle_field * 1) / 2  # Discrete angles
-    field = np.stack([np.cos(angle_field), np.sin(angle_field)], axis=2)
-
-    # v_field = curl(perlin, x, y)
-    # v_field = v_field / (np.sqrt(np.sum(v_field**2, axis=0)) + eps) # Normalize field
-
-    t_start = perf_counter()
-    lines, widths = trace_field(field, step_size)
-    t_end = perf_counter()
-    print(f"Ellapsed time: {t_end - t_start: .2f} s")
-
-    fig = plt.figure()
-    fig.set_size_inches(8, 8)
-    ax = plt.Axes(fig, [0, 0, 1, 1])
+def fig_setup(col_bg="#ffffff"):
+    """Set up figure for plotting."""
+    fig = plt.figure(figsize=(8, 8))
+    ax = plt.Axes(fig, [0, 0, 1, 1], facecolor=col_bg)
     fig.add_axes(ax)
     ax.set_xlim([-0.1, 1.1])
     ax.set_ylim([-0.1, 1.1])
-    ax.set_axis_off()
 
-    plot_style = "lines"
+    # Remove frame but keep background color
+    for s in ax.spines.values():
+        s.set_visible(False)
 
-    accent = color_palettes["autumn"]
-    selection = color_palettes["autumn"]
-    colors = np.random.choice(selection, len(lines))
+    return fig, ax
+
+def plot(lines, widths, col_lines, col_bg, style="lines"):
+    """Main plotting function."""
+    fig, ax = fig_setup(col_bg)
+
+    colors = np.random.choice(col_lines, len(lines))
 
     for line, width, color in zip(lines, widths, colors):
-        if plot_style == "lines":
+        if style == "lines":
             step = 1
             line_len = line.shape[0]
             main_line_end = int(line_len * (np.random.rand(1)*0.3 + 0.65))
@@ -193,7 +194,7 @@ if __name__ == "__main__":
             for id in reversed(ids):
                 length = int(np.random.uniform(1, 10, 1))
                 line_plot = Line(line[id:id+length, 0], line[id:id+length, 1],
-                                 color=np.random.choice(accent, 1)[0],
+                                 color=np.random.choice(col_lines, 1)[0],
                                  linewidth=width, 
                                  solid_capstyle="round")
                 ax.add_line(line_plot)
@@ -204,11 +205,54 @@ if __name__ == "__main__":
                              solid_capstyle="round")
             ax.add_line(line_plot)
 
-        if plot_style == "dots":
+        if style == "dots":
             step = int( width / step_size) + 1
             for point in line[::step]:
                 circle = plt.Circle(tuple(point), width / 2, color=color)
                 ax.add_patch(circle)
+    
+    return fig
+
+color_palettes = {
+    "autumn": [ "#03071e", "#370617", "#6a040f", "#9d0208", "#d00000", "#dc2f02",
+                "#e85d04", "#f48c06", "#faa307", "#ffba08"],
+    "violet-red": ["#ea698b","#d55d92","#c05299","#ac46a1","#973aa8","#822faf",
+                   "#6d23b6","#6411ad","#571089","#47126b"],
+    "blue-orange": ["#8ecae6", "#73bfdc", "#58b4d1", "#219ebc", "#126782", "#023047", 
+                    "#ffb703", "#fd9e02", "#fb8500", "#fb9017"],
+    "blue-berry": ["#b7094c", "#a01a58", "#892b64", "#723c70", "#5c4d7d", "#455e89", 
+                   "#2e6f95", "#1780a1", "#0091ad"],
+    "black-white": ["#000000", "#ffffff"],
+    "dark": [ "#111111", "#222222"]
+}
+
+
+if __name__ == "__main__":
+
+    # Hyper parameters
+    step_size = 0.005
+    max_len = 0.2
+    bounds = [0, 0, 1, 1]
+    max_width = 0.08
+    n_max_lines = 300
+    interpolate = True
+
+    noise = generate_fractal_noise_2d((1000, 1000), (1, 1), octaves=2, persistence=2)
+    angle_field = np.pi * ((noise - noise.min()) / (noise.max() - noise.min()) * 2 - 1)
+    angle_field = np.pi * noise
+    # angle_field = np.pi * np.round(generate_perlin_noise_2d((1000, 1000), (2, 2)) * 4) / 4
+    # angle_field = np.round(angle_field * np.pi / 4) / 4 * np.pi  # Discrete angles
+    field = np.stack([np.cos(angle_field), np.sin(angle_field)], axis=2)
+
+    width_fun = generate_width_fun("decreasing", max_width)
+    t_start = perf_counter()
+    lines, widths = trace_field(field, bounds, max_len, width_fun, n_max_lines, interpolate, step_size)
+    t_end = perf_counter()
+    print(f"Ellapsed time: {t_end - t_start: .2f} s")
+
+    style = "lines"
+    col_lines = color_palettes["autumn"]
+    fig = plot(lines, widths, col_lines, "#ffffff", style="lines")
 
     plt.show()
     fig.savefig("flow-field_02.jpg", dpi=150)

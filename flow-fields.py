@@ -1,4 +1,3 @@
-from random import uniform
 from time import perf_counter
 import numpy as np
 from matplotlib import pyplot as plt
@@ -36,6 +35,7 @@ def lerp(a, b, x):
     """Linear interpolation."""
     return a + x * (b - a)
 
+
 def curl(field, x, y, eps=0.001):
     """Computes curl of a 2D vector field."""
     # grad = np.gradient(field(x, y))
@@ -47,9 +47,11 @@ def curl(field, x, y, eps=0.001):
     curl = np.array([x_comp, - y_comp]) 
     return curl
 
+
 def get_velocity(point, field, bounds, interpolate):
     """Get velocity of field at query point (x, y).
-    Linearly interpolates between grid cells.
+    Linearly interpolates between grid cells if interpolate=True.
+    Otherwise returns vector of closest grid cell.
     """
     x_min, y_min, x_max, y_max = bounds
     h, w = field.shape[0:2]
@@ -71,8 +73,10 @@ def get_velocity(point, field, bounds, interpolate):
     
     return vel
 
+
 def is_collision(point, width, lines, widths, safety_fac=1.5):
-    if len(lines) < 1:
+    """Check if point collides with points of another line."""
+    if not lines:
         return False
 
     # Array with line width of every point on every line 
@@ -84,7 +88,9 @@ def is_collision(point, width, lines, widths, safety_fac=1.5):
 
     return np.any(is_collision)
 
+
 def out_of_bounds(point, width, bounds):
+    """Check if point is out of bounds."""
     x_min, y_min, x_max, y_max = bounds
     r = width / 2
     out_of_bounds = (   point[0] - r < x_min 
@@ -93,26 +99,34 @@ def out_of_bounds(point, width, bounds):
                      or point[1] + r > y_max)
     return out_of_bounds
 
-def generate_width_fun(name, max_width):
+
+def generate_width_dist(name, max_width):
+    """Generate a function f(x) that returns a line width.
+    Typically x is proportional to the number of lines already generated.
+    """
     # width = (0.05 - 0.005) * ((n_max_lines - len(lines)) / n_max_lines)**5  + 0.005
 
-    width_fun = None
+    width_dist = None
     if name == "uniform":
-        width_fun = partial(uniform_width, width=max_width)
+        width_dist = partial(uniform_width, width=max_width)
     elif name == "decreasing":
-        width_fun = partial(decreasing_width, max_width=max_width)
+        width_dist = partial(decreasing_width, max_width=max_width)
          
-    return width_fun
+    return width_dist
+
 
 def uniform_width(x, width):
     return width
+
 
 def decreasing_width(x, max_width):
     """Start with thick lines and gradually decrease width."""
     width = 2 / (x / 20 + 2) * max_width * (np.random.rand(1) * 0.5 + 0.5)
     return width
 
+
 def trace_line(start_point, width, lines, widths, field, bounds, max_len, interpolate, step_size):
+    """Trace single flow line of vector field."""
     line = [start_point]
     n_points = int(max_len / 2 / step_size)
 
@@ -137,13 +151,15 @@ def trace_line(start_point, width, lines, widths, field, bounds, max_len, interp
     
     return np.array(line)
 
-def trace_field(field, bounds, max_len, width_fun, n_max_lines, interpolate, step_size):
+
+def trace_field(field, bounds, max_len, width_dist, n_max_lines, interpolate, step_size):
+    """Trace flow lines of vector field."""
     lines = []
     widths = []
 
     max_attempts = 1000  # Max attempts at finding a valid starting point
     for i in range(n_max_lines):
-        width = width_fun(i)
+        width = width_dist(i)
         width = max(float(width), step_size / 5)
 
         # Try to generate valid starting point for new line
@@ -164,6 +180,7 @@ def trace_field(field, bounds, max_len, width_fun, n_max_lines, interpolate, ste
 
     return lines, widths
 
+
 def fig_setup(col_bg="#ffffff"):
     """Set up figure for plotting."""
     fig = plt.figure(figsize=(8, 8))
@@ -177,6 +194,7 @@ def fig_setup(col_bg="#ffffff"):
         s.set_visible(False)
 
     return fig, ax
+
 
 def plot(lines, widths, col_lines, col_bg, style="lines"):
     """Main plotting function."""
@@ -213,6 +231,7 @@ def plot(lines, widths, col_lines, col_bg, style="lines"):
     
     return fig
 
+
 color_palettes = {
     "autumn": [ "#03071e", "#370617", "#6a040f", "#9d0208", "#d00000", "#dc2f02",
                 "#e85d04", "#f48c06", "#faa307", "#ffba08"],
@@ -244,9 +263,9 @@ if __name__ == "__main__":
     # angle_field = np.round(angle_field * np.pi / 4) / 4 * np.pi  # Discrete angles
     field = np.stack([np.cos(angle_field), np.sin(angle_field)], axis=2)
 
-    width_fun = generate_width_fun("decreasing", max_width)
+    width_dist = generate_width_dist("decreasing", max_width)
     t_start = perf_counter()
-    lines, widths = trace_field(field, bounds, max_len, width_fun, n_max_lines, interpolate, step_size)
+    lines, widths = trace_field(field, bounds, max_len, width_dist, n_max_lines, interpolate, step_size)
     t_end = perf_counter()
     print(f"Ellapsed time: {t_end - t_start: .2f} s")
 

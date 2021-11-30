@@ -221,28 +221,42 @@ def fig_setup(col_bg="#ffffff"):
     return fig, ax
 
 
-def plot(lines, widths, col_lines, col_bg, style="lines"):
+def plot(lines, widths, col_lines, col_bg, end_splits, splits_start, step_size, style="lines"):
     """Main plotting function."""
     fig, ax = fig_setup(col_bg)
-
     colors = np.random.choice(col_lines, len(lines))
 
     for line, width, color in zip(lines, widths, colors):
         if style == "lines":
-            step = 1
             line_len = line.shape[0]
-            main_line_end = int(line_len * (np.random.rand(1)*0.3 + 0.65))
-            ids = range(main_line_end, line.shape[0], step)
+            if end_splits:
+                main_line_len = int(line_len * (np.random.rand(1) * (1 - splits_start - 0.05) + splits_start))
+                if line_len - main_line_len >= 2:
+                    n_splits = min(line_len - main_line_len, end_splits + 1)
+                    # Randomly select splits between end of main line and end of overall line
+                    ids = np.sort(np.random.choice(range(main_line_len, line_len), n_splits, replace=False))
+                    # Ensure first split starts at the end of main line and last split
+                    # ends at the very end of the overall line
+                    ids[[0, -1]] = [main_line_len, line_len + 1]
+                    # Generate slice for each split segment such that they overlap at
+                    # split point.
+                    slices = [slice(ids[i], ids[i+1] + 1) for i in range(len(ids) - 1)]
+                    for s in reversed(slices):
+                        line_plot = Line(line[s, 0], line[s, 1],
+                                        color=np.random.choice(col_lines, 1)[0],
+                                        linewidth=width, 
+                                        solid_capstyle="round")
+                        ax.add_line(line_plot)
+                else:
+                    line_plot = Line(line[main_line_len:, 0], line[main_line_len:, 1],
+                                    color=np.random.choice(col_lines, 1)[0],
+                                    linewidth=width, 
+                                    solid_capstyle="round")
+                    ax.add_line(line_plot)
+            else:
+                main_line_len = line_len
 
-            for id in reversed(ids):
-                length = int(np.random.uniform(1, 10, 1))
-                line_plot = Line(line[id:id+length, 0], line[id:id+length, 1],
-                                 color=np.random.choice(col_lines, 1)[0],
-                                 linewidth=width, 
-                                 solid_capstyle="round")
-                ax.add_line(line_plot)
-
-            line_plot = Line(line[:main_line_end, 0], line[:main_line_end, 1],
+            line_plot = Line(line[:main_line_len + 1, 0], line[:main_line_len + 1, 1],
                              linewidth=width,
                              color=color,
                              solid_capstyle="round")
@@ -291,7 +305,7 @@ if __name__ == "__main__":
 
     style = "lines"
     col_lines = color_palettes["autumn"]
-    fig = plot(lines, widths, col_lines, "#ffffff", style="lines")
+    fig = plot(lines, widths, col_lines, "#ffffff", 5, 0.65, step_size, style="lines")
 
     plt.show()
     fig.savefig("flow-field_02.jpg", dpi=150)

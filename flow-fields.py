@@ -1,4 +1,5 @@
 from time import perf_counter
+import uuid
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
@@ -271,6 +272,12 @@ def plot(lines, widths, col_lines, col_bg, end_splits, splits_start, step_size, 
     return fig
 
 
+def unique_file_name(name, rnd_len=10):
+    """Generate unique file name."""
+    file_name = name + "-" + str(uuid.uuid4().hex)[:rnd_len]
+    return  file_name
+
+
 color_palettes = {
     "autumn": [ "#03071e", "#370617", "#6a040f", "#9d0208", "#d00000", "#dc2f02",
                 "#e85d04", "#f48c06", "#faa307", "#ffba08"],
@@ -289,12 +296,17 @@ if __name__ == "__main__":
 
     # Hyper parameters
     step_size = 0.005
-    max_len = 0.2
+    max_len = 0.3
     bounds = [0, 0, 1, 1]
     max_width = 0.08
-    n_max_lines = 300
+    n_max_lines = 500
     interpolate = True
     n_cells = 200
+    end_splits = 5
+    splits_start = 0.4
+    style = "lines"
+    col_lines = color_palettes["dark"]
+    col_bg = "#fa0029"
 
     field = generate_field(n_cells, -np.pi, np.pi, round_to=0)
     width_dist = generate_width_dist("decreasing", max_width)
@@ -303,9 +315,8 @@ if __name__ == "__main__":
     t_end = perf_counter()
     print(f"Ellapsed time: {t_end - t_start: .2f} s")
 
-    style = "lines"
-    col_lines = color_palettes["autumn"]
-    fig = plot(lines, widths, col_lines, "#ffffff", 5, 0.65, step_size, style="lines")
+    fig = plot(lines, widths, col_lines, col_bg, end_splits, splits_start, step_size, style="lines")
 
     plt.show()
-    fig.savefig("flow-field_02.jpg", dpi=150)
+    file = unique_file_name("flow-field") + ".jpg"
+    fig.savefig(file, dpi=150)

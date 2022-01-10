@@ -1,4 +1,4 @@
-from time import perf_counter
+import time
 import uuid
 import numpy as np
 from matplotlib import pyplot as plt
@@ -290,6 +290,11 @@ def unique_file_name(name, rnd_len=10):
     file_name = name + "-" + str(uuid.uuid4().hex)[:rnd_len]
     return  file_name
 
+def date_file_name(name):
+    """Generate file name with date suffix."""
+    time_str = time.strftime("%Y%m%d-%H%M%S")
+    return name + "_" + time_str
+
 
 color_palettes = {
     "autumn": [ "#03071e", "#370617", "#6a040f", "#9d0208", "#d00000", "#dc2f02",
@@ -323,13 +328,13 @@ if __name__ == "__main__":
 
     field = generate_field(n_cells, -np.pi, np.pi, round_to=0)
     width_dist = generate_width_dist("decreasing", max_width)
-    t_start = perf_counter()
+    t_start = time.perf_counter()
     lines, widths = trace_field(field, bounds, max_len, width_dist, n_max_lines, interpolate, step_size)
-    t_end = perf_counter()
+    t_end = time.perf_counter()
     print(f"Ellapsed time: {t_end - t_start: .2f} s")
 
     fig = plot(lines, widths, col_lines, col_bg, end_splits, splits_start, step_size, style="lines")
 
     plt.show()
-    file = unique_file_name("flow-field") + ".jpg"
+    file = date_file_name("flow-field") + ".jpg"
     fig.savefig(file, dpi=150)

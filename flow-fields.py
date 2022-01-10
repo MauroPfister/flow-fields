@@ -91,12 +91,14 @@ def is_collision(point, width, lines, widths, safety_fac=1.5):
     if not lines:
         return False
 
+    margin = 0.0  # Fixed margin between curves, optional
+
     # Array with line width of every point on every line 
     widths_all_points = np.repeat(widths, [line.shape[0] for line in lines])
     all_points = np.vstack(lines)
     # Squared distance between query point and points of all the other lines
     dist = np.sum((all_points - point)**2, axis=1)
-    is_collision = dist < (((widths_all_points + width) / 2)**2) * safety_fac
+    is_collision = dist < (((widths_all_points + width + margin) / 2)**2) * safety_fac
 
     return np.any(is_collision)
 

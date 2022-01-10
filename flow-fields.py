@@ -230,6 +230,17 @@ def plot(lines, widths, col_lines, col_bg, end_splits, splits_start, step_size, 
     colors = np.random.choice(col_lines, len(lines))
 
     for line, width, color in zip(lines, widths, colors):
+
+        # Linearly interpolate curve to generate more interesting end segments
+        # Repeat every but last point of curve n_int times.
+        # Add scaled difference between consecutive points to repeated array
+        # to obtain interpolated curve.
+        n_int = 10
+        diff = np.repeat(np.diff(line, axis=0), n_int, axis=0) / n_int
+        int_step = np.tile(np.arange(n_int), line.shape[0] - 1)[:, np.newaxis] * diff
+        line_int = np.repeat(line, n_int, axis=0)[:-n_int] + int_step
+        line = line_int
+
         if style == "lines":
             line_len = line.shape[0]
             if end_splits:
@@ -304,11 +315,11 @@ if __name__ == "__main__":
     n_max_lines = 500
     interpolate = True
     n_cells = 200
-    end_splits = 5
+    end_splits = 7
     splits_start = 0.4
     style = "lines"
-    col_lines = color_palettes["dark"]
-    col_bg = "#fa0029"
+    col_lines = color_palettes["blue-berry"]
+    col_bg = "#010101"
 
     field = generate_field(n_cells, -np.pi, np.pi, round_to=0)
     width_dist = generate_width_dist("decreasing", max_width)
